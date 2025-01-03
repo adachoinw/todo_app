@@ -1,0 +1,71 @@
+name: Python CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  # CI JOB - Testing and Linting
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install Dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools build twine pytest flake8
+
+      # Step 4: Linting with Flake8
+      - name: Lint Code with Flake8
+        run: flake8 src/
+
+      # Step 5: Run Tests
+      - name: Run Tests
+        run: pytest tests/
+
+  # CD JOB - Deployment to PyPI (Only on Releases)
+  cd:
+    needs: ci  # Only runs if the CI job passes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install Dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools build twine
+
+      # Step 4: Build the Package
+      - name: Build the Package
+        run: python -m build
+
+      # Step 5: Deploy to PyPI
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: twine upload dist/* --non-interactive --skip-existing
